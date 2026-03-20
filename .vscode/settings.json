@@ -1,0 +1,13 @@
+{
+    "C_Cpp.default.cStandard": "c23",
+    "C_Cpp.default.cppStandard": "c++20",
+    "C_Cpp.default.compilerPath": "/opt/homebrew/Cellar/llvm/21.1.8_1/bin/clang++",
+    "C_Cpp.intelliSenseEngine": "Tag Parser",
+    "C_Cpp.formatting": "clangFormat",
+    "C_Cpp.clang_format_style": "file",
+    "clangd.enabled": false,
+    "editor.defaultFormatter": "ms-vscode.cpptools",
+    "[cpp]": {
+        "editor.defaultFormatter": "ms-vscode.cpptools"
+    }
+}

@@ -1,0 +1,39 @@
+# === (Build Outputs) ===
+*.o
+*.obj
+*.exe
+*.out
+*.app
+*.so
+*.dll
+*.dylib
+
+# === (Build Directories) ===
+[Bb]uild/
+[Dd]ebug/
+[Rr]elease/
+bin/
+obj/
+
+# === (VS Code Specific) ===
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# === (Compiler & Language Server Cache) ===
+.cache/
+.clangd/
+ipch/
+*.pch
+*.pdb
+*.ilk
+
+# === (Dependency Managers) ===
+vcpkg_installed/
+conan/
+
+# === (OS Specific) ===
+.DS_Store
+Thumbs.db
