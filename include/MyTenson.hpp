@@ -1,12 +1,12 @@
 #pragma once
 
+#include <algorithm>
 #include <concepts>
 #include <iostream>
 #include <numeric>
 #include <span>
 #include <stdexcept>
 #include <vector>
-#include <algorithm>
 
 /**
  * @brief A lightweight Tensor class for AI inference.
@@ -58,6 +58,30 @@ class MyTensor {
                 T temp = A.data_[i * K + k]; // Access A once for the inner loop
                 for (size_t j = 0; j < N; ++j) {
                     result.data_[i * N + j] += temp * B.data_[k * N + j];
+                }
+            }
+        }
+
+        return result;
+    }
+
+    // No optimization
+    static MyTensor matmul_no_op(const MyTensor &A, const MyTensor &B) {
+        if (A.shape_.cols != B.shape_.rows) {
+            throw std::invalid_argument("Incompatibal dimensions for matmul");
+        }
+
+        const size_t M = A.shape_.rows;
+        const size_t K = A.shape_.cols;
+        const size_t N = B.shape_.cols;
+
+        MyTensor result(M, N);
+
+        for (size_t i = 0; i < M; ++i) {
+            for (size_t j = 0; j < N; ++j) {
+                for (size_t k = 0; k < K; ++k) {
+                    result.data_[i * N + j] +=
+                        A.data_[i * K + k] * B.data_[k * N + j];
                 }
             }
         }
