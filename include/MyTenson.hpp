@@ -1,7 +1,8 @@
 #pragma once
 
-#ifdef __ARM_NEON
-#include <arm_neon.h>
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+    #include <arm_neon.h>
+    #define ALLEN_HAS_NEON
 #endif
 
 #include <algorithm>
@@ -94,6 +95,7 @@ class MyTensor {
     }
 
     static MyTensor matmul_neon(const MyTensor &A, const MyTensor &B) {
+    #ifdef ALLEN_HAS_NEON
         if (A.shape_.cols != B.shape_.rows) {
             throw std::invalid_argument("Incompatibal dimensions for matmul");
         }
@@ -132,6 +134,10 @@ class MyTensor {
         }
 
         return result;
+    #else
+        // Fallback for Windows/Intel/AMD
+        return matmul(A, B);
+    #endif
     }
 
     static MyTensor matmul_fused_neon(const MyTensor &A, const MyTensor &B,
