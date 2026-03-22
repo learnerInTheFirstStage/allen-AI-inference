@@ -142,6 +142,7 @@ class MyTensor {
 
     static MyTensor matmul_fused_neon(const MyTensor &A, const MyTensor &B,
                                       float bias) {
+    #ifdef ALLEN_HAS_NEON
         if (A.shape_.cols != B.shape_.rows) {
             throw std::invalid_argument("Incompatibal dimensions for matmul");
         }
@@ -194,6 +195,26 @@ class MyTensor {
         }
 
         return result;
+    #else
+        // Windows / WSL2 (x86)
+        const size_t M = A.shape_.rows;
+        const size_t K = A.shape_.cols;
+        const size_t N = B.shape_.cols;
+        MyTensor result(M, N);
+        for (size_t i = 0; i < M; ++i) {
+            for (size_t k = 0; k < K; ++k) {
+                float temp = A.data_[i * K + k];
+                for (size_t j = 0; j < N; ++j) {
+                    result.data_[i * N + j] += temp * B.data_[k * N + j];
+                }
+            }
+            // Fusion: Bias + ReLU
+            for (size_t j = 0; j < N; ++j) {
+                result.data_[i * N + j] = std::max(0.0f, result.data_[i * N + j] + bias);
+            }
+        }
+        return result;
+    #endif
     }
 
     void print() const {

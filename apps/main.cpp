@@ -2,6 +2,8 @@
 #include <chrono>
 #include <iostream>
 
+extern "C" void launch_matmul_kernel(const float* h_A, const float* h_B, float* h_C, int M, int K, int N);
+
 /**
  * @brief Simple RAII Timer to measure execution time.
  */
@@ -27,7 +29,7 @@ class Timer {
 
 int main() {
     try {
-        const size_t N = 1024;
+        const size_t N = 4096;
         std::cout << "Initializing two " << N << "x" << N << " matrices..."
                   << std::endl;
 
@@ -36,29 +38,35 @@ int main() {
         MyTensor<float> B(N, N);
         B.fill(2.2f);
 
-        std::cout << "Testing on M1 (Release Mode)..." << std::endl;
+        // std::cout << "Testing on M1 (Release Mode)..." << std::endl;
+        // {
+        //     Timer t("Matrix Multiplication with optimization (1024x1024)");
+        //     auto C = MyTensor<float>::matmul(A, B);
+        // }
+
+        // {
+        //     Timer t("Matrix Multiplication (1024x1024)");
+        //     auto C = MyTensor<float>::matmul_no_op(A, B);
+        // }
+
+        // {
+        //     Timer t("Manual NEON Kernel");
+        //     auto C = MyTensor<float>::matmul_neon(A, B);
+        // }
+
+        // float bias{-0.5f}; // Some bias to test ReLU
+
+        // std::cout << "--- AI Infra Benchmark (MacBook M1) ---" << std::endl;
+        // {
+        //     Timer t("Fused MatMul + Bias + ReLU (Manual NEON)");
+        //     auto C = MyTensor<float>::matmul_fused_neon(A, B, bias);
+        // };
+
         {
-            Timer t("Matrix Multiplication with optimization (1024x1024)");
-            auto C = MyTensor<float>::matmul(A, B);
+            Timer t("CUDA 4070 Ti Kernel (Naive)");
+            MyTensor<float> C_gpu(N, N);
+            launch_matmul_kernel(A.data().data(), B.data().data(), const_cast<float*>(C_gpu.data().data()), N, N, N);
         }
-
-        {
-            Timer t("Matrix Multiplication (1024x1024)");
-            auto C = MyTensor<float>::matmul_no_op(A, B);
-        }
-
-        {
-            Timer t("Manual NEON Kernel");
-            auto C = MyTensor<float>::matmul_neon(A, B);
-        }
-
-        float bias{-0.5f}; // Some bias to test ReLU
-
-        std::cout << "--- AI Infra Benchmark (MacBook M1) ---" << std::endl;
-        {
-            Timer t("Fused MatMul + Bias + ReLU (Manual NEON)");
-            auto C = MyTensor<float>::matmul_fused_neon(A, B, bias);
-        };
 
         std::cout << "Done." << std::endl;
 
