@@ -36,6 +36,7 @@ int main() {
         MyTensor<float> B(N, N);
         B.fill(2.2f);
 
+        std::cout << "Testing on M1 (Release Mode)..." << std::endl;
         {
             Timer t("Matrix Multiplication with optimization (1024x1024)");
             auto C = MyTensor<float>::matmul(A, B);
@@ -45,6 +46,19 @@ int main() {
             Timer t("Matrix Multiplication (1024x1024)");
             auto C = MyTensor<float>::matmul_no_op(A, B);
         }
+
+        {
+            Timer t("Manual NEON Kernel");
+            auto C = MyTensor<float>::matmul_neon(A, B);
+        }
+
+        float bias{-0.5f}; // Some bias to test ReLU
+
+        std::cout << "--- AI Infra Benchmark (MacBook M1) ---" << std::endl;
+        {
+            Timer t("Fused MatMul + Bias + ReLU (Manual NEON)");
+            auto C = MyTensor<float>::matmul_fused_neon(A, B, bias);
+        };
 
         std::cout << "Done." << std::endl;
 
