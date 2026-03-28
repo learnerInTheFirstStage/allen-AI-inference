@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.15)
 project(MyInference VERSION 1.0.0 LANGUAGES CXX CUDA)
 
+# Ensure CUDA architecture selection policy is set and fallback is provided (CMP0104)
+cmake_policy(SET CMP0104 NEW)
+if(NOT CMAKE_CUDA_ARCHITECTURES)
+    # Use a safe set of PTX/SASS archs for compatibility with most NVCC versions
+    set(CMAKE_CUDA_ARCHITECTURES "52;60;61;70;75;80" CACHE STRING "CUDA architectures" FORCE)
+endif()
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3")
