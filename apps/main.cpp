@@ -3,6 +3,7 @@
 #include <iostream>
 
 extern "C" void launch_matmul_kernel(const float* h_A, const float* h_B, float* h_C, int M, int K, int N);
+extern "C" void launch_fused_matmul_kernel(const float* h_A, const float* h_B, float* h_C, int M, int K, int N, float bias);
 
 /**
  * @brief Simple RAII Timer to measure execution time.
@@ -27,6 +28,7 @@ class Timer {
     std::chrono::time_point<std::chrono::high_resolution_clock> start_;
 };
 
+
 int main() {
     try {
         const size_t N = 4096;
@@ -37,6 +39,8 @@ int main() {
         A.fill(1.1f);
         MyTensor<float> B(N, N);
         B.fill(2.2f);
+
+        MyTensor<float> C_gpu(N, N);
 
         // std::cout << "Testing on M1 (Release Mode)..." << std::endl;
         // {
@@ -63,9 +67,14 @@ int main() {
         // };
 
         {
-            Timer t("CUDA 4070 Ti Kernel (Naive)");
-            MyTensor<float> C_gpu(N, N);
+            Timer t("CUDA 4070 Ti Kernel (Naive)");           
             launch_matmul_kernel(A.data().data(), B.data().data(), const_cast<float*>(C_gpu.data().data()), N, N, N);
+        }
+
+        {
+            Timer t("CUDA 4070 Ti kernel (Fused)");
+            float bias_val = -0.5f;
+            launch_fused_matmul_kernel(A.data().data(), B.data().data(), const_cast<float*>(C_gpu.data().data()), N, N, N, bias_val);
         }
 
         std::cout << "Done." << std::endl;
