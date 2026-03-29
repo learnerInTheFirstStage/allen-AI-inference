@@ -3,6 +3,7 @@
 #include <iostream>
 
 #define TILE_SIZE 32
+#define NUM_STREAMS 4
 
 // Fused Tiled Kernel: MatMul + Bias + ReLU
 __global__ void matmul_tiled_fused_kernel(const float* A, const float* B, float* C, int M, int K, int N, float bias)
@@ -126,8 +127,8 @@ extern "C" void launch_matmul_kernel(const float* h_A, const float* h_B, float* 
     // 3. Define Grid and Block dimensions
     // dim3 threadsPerBlock(16, 16);
     dim3 threadsPerBlock(TILE_SIZE, TILE_SIZE);
-    dim3 numBlocks((N + threadsPerBlock.x - 1) / threadsPerBlock.x, 
-                   (M + threadsPerBlock.y - 1) / threadsPerBlock.y);
+    dim3 numBlocks((N + TILE_SIZE - 1) / TILE_SIZE, 
+                   (M + TILE_SIZE - 1) / TILE_SIZE);
 
     cudaDeviceSynchronize();
     auto start = std::chrono::high_resolution_clock::now();
@@ -169,8 +170,8 @@ extern "C" void launch_fused_matmul_kernel(const float* h_A, const float* h_B, f
     // 3. Define Grid and Block dimensions
     // dim3 threadsPerBlock(16, 16);
     dim3 threadsPerBlock(TILE_SIZE, TILE_SIZE);
-    dim3 numBlocks((N + threadsPerBlock.x - 1) / threadsPerBlock.x, 
-                   (M + threadsPerBlock.y - 1) / threadsPerBlock.y);
+    dim3 numBlocks((N + TILE_SIZE - 1) / TILE_SIZE, 
+                   (M + TILE_SIZE - 1) / TILE_SIZE);
 
     cudaDeviceSynchronize();
     auto start = std::chrono::high_resolution_clock::now();
@@ -191,4 +192,67 @@ extern "C" void launch_fused_matmul_kernel(const float* h_A, const float* h_B, f
     cudaFree(d_A);
     cudaFree(d_B);
     cudaFree(d_C);
+}
+
+// Memory Pooled Version: only for calculation, not for memory allocation & free and data movement
+extern "C" void launch_fused_matmul_kernel_pooled(const float* h_A, const float* h_B, float* h_C, int M, int K, int N, float bias)
+{
+    // 1. Define Grid and Block dimensions
+    dim3 threadsPerBlock(TILE_SIZE, TILE_SIZE);
+    dim3 numBlocks((N + TILE_SIZE - 1) / TILE_SIZE, 
+                   (M + TILE_SIZE - 1) / TILE_SIZE);
+
+    cudaDeviceSynchronize();
+    auto start = std::chrono::high_resolution_clock::now();
+    
+    // 2. Launch Kernel
+    matmul_tiled_fused_kernel <<< numBlocks, threadsPerBlock >>>  (h_A, h_B, h_C, M, K, N, bias);
+
+    cudaDeviceSynchronize();
+    auto end = std::chrono::high_resolution_clock::now();
+
+    auto kernel_time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    std::cout << "[CUDA Internal] Pure Kernel Execution (Fused & Pooled): " << kernel_time / 1000.0 << " ms" << std::endl;
+}
+
+extern "C" void launch_pipelined_matmul(
+    float* h_A, float* h_B, float* h_C,
+    float* d_A, float* d_B, float* d_C,
+    int M, int K, int N, float bias)
+{
+    cudaStream_t streams[NUM_STREAMS];
+    for (int i = 0; i < NUM_STREAMS; ++i) cudaStreamCreate(&streams[i]);
+
+    int rows_per_stream = M / NUM_STREAMS;
+    size_t chunk_A = rows_per_stream * K * sizeof(float);
+    size_t chunk_C = rows_per_stream * N * sizeof(float);
+    size_t full_B = K * N * sizeof(float);
+
+    // 1. Move the entile B (Each row computation needs full B)
+    cudaMemcpyAsync(d_B, h_B, full_B, cudaMemcpyHostToDevice, streams[0]);
+
+    // 2. Start streams
+    for (int i = 0; i < NUM_STREAMS; ++i)
+    {
+        int offset_A = i * rows_per_stream * K;
+        int offset_C = i * rows_per_stream * N;
+
+        // copy piece of A asynchronously
+        cudaMemcpyAsync(d_A + offset_A, h_A + offset_A, chunk_A, cudaMemcpyHostToDevice, streams[i]);
+        
+        dim3 threads(TILE_SIZE, TILE_SIZE);
+        dim3 blocks((N + TILE_SIZE - 1) / TILE_SIZE, (rows_per_stream + TILE_SIZE - 1) / TILE_SIZE);
+
+        matmul_tiled_fused_kernel<<<blocks, threads, 0, streams[i]>>>(
+            d_A + offset_A, d_B, d_C + offset_C, rows_per_stream, K, N, bias
+        );
+
+        cudaMemcpyAsync(h_C + offset_C, d_C + offset_C, chunk_C, cudaMemcpyDeviceToHost, streams[i]);
+    }
+
+    for (int i = 0; i < NUM_STREAMS; ++i)
+    {
+        cudaStreamSynchronize(streams[i]);
+        cudaStreamDestroy(streams[i]);
+    }
 }
